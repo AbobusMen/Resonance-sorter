@@ -8,4 +8,4 @@ A package for classifying the behavior of resonant arguments based on a convolut
 - `models/` – обученные модели.
 - `time_series/` - примеры временных рядов углов для подачи в модель.
 
-#ошибка в функциях визуализации - при построении отсекает границы
+
