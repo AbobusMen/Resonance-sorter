@@ -67,7 +67,7 @@ def load_model(
                         На случай добавление моделей без кастомных аугментаций
     """
     path = resolve_model_path(model_id, models_dir)
-    # Если custom_objects не передан явно, берём стандартный набор
+    # Если custom_objects не передан явно, берём стандартный набор для двух моделей
     if custom_objects is None:
         custom_objects = DEFAULT_CUSTOM_OBJECTS
     model = keras.models.load_model(path, custom_objects=custom_objects, compile=False)
@@ -132,3 +132,5 @@ def predict_classes_from_proba(proba: np.ndarray) -> np.ndarray:
     Индексы классов 0, 1 или 2.
   """
   return np.argmax(proba, axis=-1)
+
+#Нелбходима возможность работы со всем набором вероятностей

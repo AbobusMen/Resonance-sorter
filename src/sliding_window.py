@@ -18,9 +18,7 @@ def sliding_windows_multiplet(
   overlap_ratio : float
     Доля перекрытия между соседними окнами в диапазоне [0.0, 1.0).
     0.0 — без перекрытия, 0.5 — перекрытие на половину.
-
-  Returns
-  -------
+    Возвращает:
   windows_data : dict
     Словарь с ключами:
     - 'angle_windows' : list of np.ndarray (n_windows, window_length, 2)
