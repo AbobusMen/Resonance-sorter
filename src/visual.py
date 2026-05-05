@@ -2,6 +2,31 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import ScalarFormatter
 
+#Исправление ошибки нормализации угла к диапазону
+def normalize_resonant_angle(
+    phi: np.ndarray,
+    angle_min: float = -90.0,
+    angle_max: float = 270.0,
+) -> np.ndarray:
+    """
+    Приводит резонансный угол (в градусах) к заданному диапазону [angle_min, angle_max].
+
+    Параметры:
+        phi : np.ndarray
+            Входной угол в градусах (любого масштаба).
+        angle_min, angle_max : float
+            Границы желаемого интервала отображения.
+
+    Возвращает:
+        np.ndarray той же формы, что и phi, со значениями в [angle_min, angle_max].
+    """
+    phi = phi % 360.0
+    too_low = phi < angle_min
+    too_high = phi > angle_max
+    phi = np.where(too_low, phi + 360.0, phi)
+    phi = np.where(too_high, phi - 360.0, phi)
+    return phi
+
 
 def plot_angles(
     time_years: np.ndarray,
@@ -10,9 +35,13 @@ def plot_angles(
     save_path: str | None = None,
     fig_width: float = 10.0,
     row_height: float = 2.5,
+    angle_min: float = -90.0,
+    angle_max: float = 270.0,
 ):
     """
     Рисует временные ряды углов без отношения периодов.
+
+    Углы автоматически нормализуются в диапазон [angle_min, angle_max].
 
     Параметры:
         time_years : np.ndarray, shape (N,)
@@ -27,6 +56,8 @@ def plot_angles(
             Ширина рисунка в дюймах.
         row_height : float
             Высота одного подграфика в дюймах.
+        angle_min, angle_max : float
+            Границы отображаемого диапазона углов (по умолчанию -90, 270).
     """
     num_angles = len(angles_deg_list)
     fig, axes = plt.subplots(
@@ -36,7 +67,7 @@ def plot_angles(
     )
     if num_angles == 1:
         axes = [axes]
-    #Based on a script developed by Dr. Christophe Cossou
+
     # Форматтер для оси X
     xfmt = ScalarFormatter(useOffset=True)
     xfmt.set_scientific(True)
@@ -44,9 +75,12 @@ def plot_angles(
 
     for i, angle_deg in enumerate(angles_deg_list):
         ax = axes[i]
-        ax.set_yticks(np.arange(-90, 271, 90))
-        ax.set_ylim(-90, 270)
-        ax.plot(time_years, angle_deg, '.', markersize=0.5, alpha=0.8)
+        # Нормализуем угол
+        phi_plot = normalize_resonant_angle(angle_deg, angle_min, angle_max)
+        # Настройка оси Y
+        ax.set_yticks(np.arange(angle_min, angle_max + 1, 90))
+        ax.set_ylim(angle_min, angle_max)
+        ax.plot(time_years, phi_plot, '.', markersize=0.5, alpha=0.8)
         ax.set_ylabel(rf"$\varphi_{{{i}}}^\circ$")
         ax.grid(True)
         ax.xaxis.set_major_formatter(xfmt)
@@ -72,9 +106,13 @@ def plot_raw_multiplet(
     save_path: str | None = None,
     fig_width: float = 10.0,
     row_height: float = 2.5,
+    angle_min: float = -90.0,
+    angle_max: float = 270.0,
 ):
     """
     Рисует исходные временные ряды: отношение периодов и углы мультиплета на интервале.
+
+    Углы автоматически нормализуются в диапазон [angle_min, angle_max] через normalize_resonant_angle().
 
     Параметры:
         time_years : np.ndarray, shape (N,)
@@ -91,17 +129,18 @@ def plot_raw_multiplet(
             Ширина рисунка в дюймах.
         row_height : float
             Высота одного подграфика в дюймах.
+        angle_min, angle_max : float
+            Границы отображения углов (по умолчанию -90, 270).
     """
     num_angles = len(angles_deg_list)
     nb_rows = 1 + num_angles          # первая строка под период, остальные под углы
     fig_height = row_height * nb_rows
     fig, axes = plt.subplots(nb_rows, 1, figsize=(fig_width, fig_height), sharex=True)
 
-    # Чтобы работало и с одним подграфиком
     if nb_rows == 1:
         axes = [axes]
 
-    # Настройка форматтера для оси X (научная нотация)
+    # Настройка форматтера для оси X
     xfmt = ScalarFormatter(useOffset=True)
     xfmt.set_scientific(True)
     xfmt.set_powerlimits((-3, 3))
@@ -116,9 +155,10 @@ def plot_raw_multiplet(
     # 2) Углы
     for i, angle_deg in enumerate(angles_deg_list):
         ax = axes[i + 1]
-        ax.set_yticks(np.arange(-90, 271, 90))
-        ax.set_ylim(-90, 270)
-        ax.plot(time_years, angle_deg, '.', markersize=0.5, alpha=0.8)
+        phi_plot = normalize_resonant_angle(angle_deg, angle_min, angle_max)
+        ax.set_yticks(np.arange(angle_min, angle_max + 1, 90))
+        ax.set_ylim(angle_min, angle_max)
+        ax.plot(time_years, phi_plot, '.', markersize=0.5, alpha=0.8)
         ax.set_ylabel(r"$\varphi_{%d}^{\circ}$" % i)
         ax.grid(True)
 
@@ -146,10 +186,13 @@ def plot_multiplet_predictions(
     fig_width: float = 12.0,
     row_height: float = 2.5,
     alpha: float = 0.3,
+    angle_min: float = -90.0,
+    angle_max: float = 270.0,
 ):
     """
     Рисует углы мультиплета с заливкой окон по предсказанным классам.
-    
+
+    Углы автоматически нормализуются в диапазон [angle_min, angle_max] через normalize_resonant_angle().
     Параметры:
         time_years : np.ndarray, shape (N,)
             Время в годах для каждой точки исходного ряда.
@@ -169,29 +212,26 @@ def plot_multiplet_predictions(
             Высота одного подграфика.
         alpha : float
             Прозрачность заливки.
+        angle_min, angle_max : float
+            Границы отображения углов (по умолчанию -90, 270).
     """
-    # Цвета классов: 0 – циркуляция (синий), 1 – либрация (зелёный), 2 – переходный (фиолетовый)
     colors = {0: 'blue', 1: 'green', 2: 'purple'}
     labels = {0: 'Циркуляция', 1: 'Либрация', 2: 'Переходный'}
-    
+
     num_angles = len(angles_deg_list)
     fig, axes = plt.subplots(num_angles, 1, figsize=(fig_width, row_height * num_angles), sharex=True)
     if num_angles == 1:
         axes = [axes]
-    
-    # Для каждого угла
-    #Based on a script developed by Dr. Christophe Cossou
+
     for i, (angle_deg, class_labels) in enumerate(zip(angles_deg_list, class_labels_list)):
         ax = axes[i]
-        ax.set_yticks(np.arange(-90, 271, 90))
-        ax.set_ylim(-90, 270)
-        
+        phi_plot = normalize_resonant_angle(angle_deg, angle_min, angle_max)
+        ax.set_yticks(np.arange(angle_min, angle_max + 1, 90))
+        ax.set_ylim(angle_min, angle_max)
+
         # Заливка окон цветом класса
         for j, (start, end) in enumerate(window_bounds):
-            # Время начала и конца окна
             t_start = time_years[start]
-            # Конец окна: последняя точка окна + половина интервала до следующей точки,
-            # чтобы заливка была без разрывов. Если end < len(time_years), иначе продлеваем по последнему шагу.
             if end < len(time_years):
                 t_end = time_years[end-1] + 0.5 * (time_years[end] - time_years[end-1])
             else:
@@ -199,23 +239,22 @@ def plot_multiplet_predictions(
                 t_end = time_years[-1] + 0.5 * dt
             cls = class_labels[j]
             ax.axvspan(t_start, t_end, color=colors[cls], alpha=alpha, label=None)
-        
-        # Основной график угла (чёрные точки)
-        ax.plot(time_years, angle_deg, '.', color='black', markersize=0.5, alpha=0.8)
-        # ax.set_ylabel(rf"$\varphi_{{{i}}}\ (^\circ)$")
+
+        # Основной график угла (чёрные точки) — используем нормализованные значения
+        ax.plot(time_years, phi_plot, '.', color='black', markersize=0.5, alpha=0.8)
         ax.set_ylabel(rf"$\varphi_{{{i}}}^\circ$")
         ax.grid(True)
-    
-    # Создаём легенду вручную (один раз для всей фигуры)
+
+    # Легенда
     handles = [plt.Rectangle((0,0),1,1, color=colors[c], alpha=alpha) for c in [0,1,2]]
     fig.legend(handles, [labels[c] for c in [0,1,2]], loc='upper right', bbox_to_anchor=(0.98, 0.98))
-    
+
     axes[-1].set_xlabel("Время (годы)")
-    
+
     if title:
         fig.suptitle(title)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])  # оставляем место для заголовка и легенды
-    
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
+
     if save_path:
         fig.savefig(save_path, dpi=150)
     plt.show()
