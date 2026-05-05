@@ -258,3 +258,58 @@ def plot_multiplet_predictions(
     if save_path:
         fig.savefig(save_path, dpi=150)
     plt.show()
+
+# Для непрервно распределённых вероятностей с перекрытием окно в 1/2 окна (есть подынтервал)
+def plot_continuous_classes(
+    time_years: np.ndarray,
+    angles_deg_list: list[np.ndarray],
+    class_labels_list: list[np.ndarray],   # непрерывные метки, длина T для каждого угла
+    title: str | None = None,
+    save_path: str | None = None,
+    fig_width: float = 12.0,
+    row_height: float = 2.5,
+    alpha: float = 0.8,
+):
+    """
+    Рисует углы, окрашивая каждую точку в соответствии с предсказанным классом
+    (результат непрерывной классификации). Цвета такие же, как в plot_multiplet_predictions.
+
+    Параметры:
+        time_years : np.ndarray (N,)
+        angles_deg_list : list of np.ndarray (N,) каждый
+        class_labels_list : list of np.ndarray (N,) каждый (значения 0,1,2)
+        title, save_path, fig_width, row_height : стандартные
+        alpha : прозрачность точек
+    """
+    colors = {0: 'blue', 1: 'green', 2: 'purple'}
+    labels = {0: 'Циркуляция', 1: 'Либрация', 2: 'Переходный'}
+
+    num_angles = len(angles_deg_list)
+    fig, axes = plt.subplots(num_angles, 1, figsize=(fig_width, row_height * num_angles), sharex=True)
+    if num_angles == 1:
+        axes = [axes]
+
+    for i, (angle_deg, cls) in enumerate(zip(angles_deg_list, class_labels_list)):
+        ax = axes[i]
+        ax.set_yticks(np.arange(-90, 271, 90))
+        ax.set_ylim(-90, 270)
+        # Нормализуем угол
+        phi_plot = normalize_resonant_angle(angle_deg)  # если функция в этом же файле
+        # Рисуем точки разными цветами по классам
+        for c in [0, 1, 2]:
+            mask = cls == c
+            ax.plot(time_years[mask], phi_plot[mask], '.', markersize=0.5, alpha=alpha, color=colors[c])
+        ax.set_ylabel(rf"$\varphi_{{{i}}}^\circ$")
+        ax.grid(True)
+
+    axes[-1].set_xlabel("Время (годы)")
+    handles = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors[c], markersize=8) for c in [0,1,2]]
+    fig.legend(handles, [labels[c] for c in [0,1,2]], loc='upper right', bbox_to_anchor=(0.98, 0.98))
+
+    if title:
+        fig.suptitle(title)
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    if save_path:
+        fig.savefig(save_path, dpi=150)
+    plt.show()
+

@@ -87,3 +87,81 @@ def average_overlapping_probs(probs_list, window_bounds, step=None):
         'bounds': sub_bounds,
         'centers': centers
     }
+
+
+#Непрерывная вероятность для подынтервала с перекрытием в 1/2 окна. Пока только такая реализация, без перекрытий в 1/3 и т.д.
+def continuous_probabilities(probs_list, window_bounds):
+    """
+    Непрерывные вероятности классов для каждой точки исходного ряда
+    с треугольным весовым усреднением в зонах перекрытия окон.
+    
+
+    Параметры:
+        probs_list : list of np.ndarray (n_windows, 3)
+            Предсказанные вероятности для каждого окна и каждого угла.
+        window_bounds : list of tuple (start_idx, end_idx)
+            Границы окон в индексах исходного временного ряда.
+    Возвращает:
+        dict с ключами:
+            'probs' : list of np.ndarray (T, 3)  – вероятности для каждой точки
+            'classes' : list of np.ndarray (T,)  – метки классов (argmax)
+            где T – общая длина исходного ряда (конец последнего окна).
+            
+    Первый и последний подынтервалы заполняются вероятностями соответствующих окон без вычисления весов, т.к имеют лишь один набор вероятностей от одного окна.
+
+            
+    """
+    total_length = window_bounds[-1][1]
+    T = total_length
+    n_angles = len(probs_list)
+    n_windows = len(window_bounds)
+
+    # Определим границы первого и последнего подынтервалов
+    first_segment_end = window_bounds[1][0] if n_windows > 1 else window_bounds[0][1] # до начала второго окна
+    last_segment_start = window_bounds[-1][0]   # начало последнего окна
+
+    all_probs = []
+    all_classes = []
+
+    for angle_probs in probs_list:
+        result_prob = np.zeros((T, 3), dtype=np.float32)
+
+        # 1) Первый подынтервал: вероятности первого окна (для всех точек - одно значение)
+        result_prob[:first_segment_end] = angle_probs[0]
+        # 2) Последний подынтервал: вероятности последнего окна (для всех точек - одно значение)
+        result_prob[last_segment_start:] = angle_probs[-1]
+
+        # 3) Промежуточные точки
+        if n_windows > 2:
+            window_length = window_bounds[0][1] - window_bounds[0][0] # длина подынтервала
+            half_window = window_length / 2.0 # середина подынтервала
+
+            sum_weighted = np.zeros((T, 3), dtype=np.float32) # веса
+            sum_weights = np.zeros(T, dtype=np.float32) # cумма взвешенных вероятностей 
+
+            # Обрабатываем все окна, вклад будет добавлен и для промежуточных точек
+            for idx in range(n_windows):
+                start, end = window_bounds[idx]
+                center = (start + end - 1) / 2.0 # середина окна-подынтервала через интексы
+                t_indices = np.arange(start, end) # вектор индексов
+                dist = np.abs(t_indices - center) # дистанция от центра 
+                # 4000->2000->[1000] (500;500)
+                weight = np.maximum(0, 1.0 - dist / half_window) # max[0,1-d/half_window]
+
+                # TRIMA треугольное весовое усреднение
+                prob = angle_probs[idx]
+                sum_weighted[t_indices] += weight[:, np.newaxis] * prob[np.newaxis, :]
+                sum_weights[t_indices] += weight
+
+            # Заменяем значения в промежуточной области взвешенным средним
+            middle_region = slice(first_segment_end, last_segment_start)
+            valid = sum_weights[middle_region] > 0
+            result_prob[middle_region][valid] = (sum_weighted[middle_region][valid] / 
+                                                 sum_weights[middle_region, np.newaxis][valid])
+
+        all_probs.append(result_prob)
+        all_classes.append(np.argmax(result_prob, axis=1))
+
+    return {'probs': all_probs, 'classes': all_classes}
+
+    
